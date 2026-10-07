@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nahuatl Orthography Converter</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #1a1a1a;
+            --box-bg: #fdf6e3;
+            --border: #333333;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1b1b1b;
+                --fg: #eeeeee;
+                --box-bg: #2a2a2a;
+                --border: #888888;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px 16px;
+        }
+
+        main {
+            width: 100%;
+            max-width: 740px;
+            display: flex;
+            flex-direction: column;
+            gap: 36px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        label {
+            font-size: 1.15rem;
+            padding-left: 4px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 32vh;
+            min-height: 160px;
+            max-height: 320px;
+            padding: 12px;
+            font: inherit;
+            font-size: 1.05rem;
+            color: var(--fg);
+            background: var(--box-bg);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            resize: vertical;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 16px;
+                align-items: flex-start;
+            }
+
+            main {
+                gap: 24px;
+            }
+
+            textarea {
+                height: 34vh;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <div class="field">
+            <label for="classical">Classical Orthography</label>
+            <textarea id="classical" spellcheck="false"></textarea>
+        </div>
+        <div class="field">
+            <label for="modern">INALI Orthography</label>
+            <textarea id="modern" spellcheck="false"></textarea>
+        </div>
+    </main>
+
+    <script>
+        // Preserve case and macrons
+        const MACRON = { a: 'ā', e: 'ē', i: 'ī', o: 'ō', u: 'ū' };
+        const UNMACRON = { 'ā': 'a', 'ē': 'e', 'ī': 'i', 'ō': 'o', 'ū': 'u' };
+        const baseOf = ch => { const l = ch.toLowerCase(); return UNMACRON[l] || l; };
+        const isUpper = ch => ch !== ch.toLowerCase();
+
+        // A case-insensitive regex where every vowel also matches its macronized form
+        function makeRule(from, to) {
+            const pattern = [...from]
+                .map(c => (MACRON[c] ? '[' + c + MACRON[c] + ']\u0304?' : c))
+                .join('');
+            return { re: new RegExp(pattern, 'gi'), to };
+        }
+
+        // Builds the replacement for one match, maintaining capitalization
+        // and macronization of vowels that survive into the output
+        function convertMatch(matched, to) {
+            const tokens = [];
+            for (const ch of matched) {
+                if (ch === '\u0304') tokens[tokens.length - 1].mac = true;
+                else tokens.push({ ch, mac: ch.toLowerCase() in UNMACRON, used: false });
+            }
+            const allUpper = tokens.length > 1 && tokens.every(t => isUpper(t.ch));
+            const firstUpper = isUpper(tokens[0].ch);
+            let out = '';
+            [...to].forEach((c, j) => {
+                let mac = false;
+                if (MACRON[c]) {
+                    const src = tokens.find(t => !t.used && baseOf(t.ch) === c);
+                    if (src) { src.used = true; mac = src.mac; }
+                }
+                let ch = mac ? MACRON[c] : c;
+                if (allUpper || (j === 0 && firstUpper)) ch = ch.toUpperCase();
+                out += ch;
+            });
+            return out;
+        }
+
+        function applyRules(text, rules) {
+            for (const rule of rules) {
+                text = text.replace(rule.re, m => convertMatch(m, rule.to));
+            }
+            return text;
+        }
+
+        // Rules
+        const MODERN_TO_CLASSICAL = [
+            ['iwkin', 'yuhquin'], ['kis', 'quiz'], ['kch', 'cch'], ['kwa', 'cua'],
+            ['kwi', 'cui'], ['kwe', 'cue'], ['kw', 'cuh'], ['stl', 'ztl'],
+            ['aso', 'azo'], ['ts', 'tz'], ['sa', 'za'], ['sk', 'zc'], ['se', 'ce'],
+            ['si', 'ci'], ['st', 'zt'], ['ka', 'ca'], ['ki', 'qui'], ['ke', 'que'],
+            ['ok', 'oc'], ['k', 'c'], ['wa', 'hua'], ['we', 'hue'], ['wi', 'hui'],
+            ['aw', 'auh'], ['ew', 'euh'], ['iw', 'iuh'], ['s', 'z']
+        ].map(([f, t]) => makeRule(f, t));
+
+        const CLASSICAL_TO_MODERN = [
+            ['z', 's'], ['yuh', 'iw'], ['cua', 'kwa'], ['cue', 'kwe'], ['cui', 'kwi'],
+            ['qui', 'ki'], ['que', 'ke'], ['qu', 'k'], ['ce', 'se'], ['ci', 'si'],
+            ['c', 'k'], ['kh', 'ch'], ['uh', 'w'], ['hu', 'w']
+        ].map(([f, t]) => makeRule(f, t));
+
+        function modernToClassical(word) { return applyRules(word, MODERN_TO_CLASSICAL); }
+        function classicalToModern(morpheme) { return applyRules(morpheme, CLASSICAL_TO_MODERN); }
+
+        const classicalBox = document.getElementById('classical');
+        const modernBox = document.getElementById('modern');
+
+        // Use .value so the two boxes don't trigger each other in a loop
+        classicalBox.addEventListener('input', () => {
+            modernBox.value = classicalToModern(classicalBox.value);
+        });
+
+        modernBox.addEventListener('input', () => {
+            classicalBox.value = modernToClassical(modernBox.value);
+        });
+    </script>
+</body>
+
+</html>
