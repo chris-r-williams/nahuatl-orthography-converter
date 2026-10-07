@@ -166,7 +166,7 @@
         const CLASSICAL_TO_MODERN = [
             ['z', 's'], ['yuh', 'iw'], ['cua', 'kwa'], ['cue', 'kwe'], ['cui', 'kwi'],
             ['qui', 'ki'], ['que', 'ke'], ['qu', 'k'], ['ce', 'se'], ['ci', 'si'],
-            ['c', 'k'], ['kh', 'ch'], ['uh', 'w'], ['hu', 'w']
+            ['c', 'k'], ['kh', 'ch'], ['uh', 'w'], ['hu', 'w'], ['ç', 's']
         ].map(([f, t]) => makeRule(f, t));
 
         function modernToClassical(word) { return applyRules(word, MODERN_TO_CLASSICAL); }
